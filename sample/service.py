@@ -1,8 +1,13 @@
-import regex
-import urllib2
 import httplib
-import sample.database
+import os
+import urllib2
+import webbrowser
+
+import regex
 from bs4 import BeautifulSoup
+
+import sample.database
+import sample.html_format
 
 httplib.HTTPConnection._http_vsn = 10
 httplib.HTTPConnection._http_vsn_str = 'HTTP/1.0'
@@ -38,6 +43,7 @@ def _append_keywords_to_user(user, keywords):
 
 def search(email):
     user = sample.database.find_by_email(email)
+    result_by_keyword = {}
     for keyword in user.keyword_list:
         print 'Search text : ' + keyword.search_text
 
@@ -69,17 +75,23 @@ def search(email):
                     duration = li.find('var', {'class': ['duration']}).text
                     hd = li.find('span', {'class': 'hd-thumbnail'})
                     percent = li.find('div', {'class': 'value'}).text
-                    view = li.find('span', {'class': 'views'}).text
-                    checked = li.find('span', {'class': 'own-video-thumbnail main-sprite tooltipTrig'})
+                    views = li.find('span', {'class': 'views'}).text
+                    verified = li.find('span', {'class': 'own-video-thumbnail main-sprite tooltipTrig'})
                     added = li.find('var', {'class': 'added'}).text
-                    print 'https://fr.pornhub.com/view_video.php?viewkey=' + current + ' ' + (
-                        'no pic' if not a_img else a_img['data-mediumthumb']) + ' ' + duration + ' ' + (
-                        'LOW' if not hd else hd.text) + ' ' + percent + ' ' + view + ' ' + (
-                        'NOT CHECKED' if not checked else 'CHECKED') + ' ' + added + ' ' + (
-                        'no title' if not a_img else a_img['alt'])
+
+                    result_by_keyword[keyword] = {}
+                    result_by_keyword[keyword]['TITLE'] = 'no title' if not a_img else a_img['alt']
+                    result_by_keyword[keyword]['VIDEO_KEY'] = current
+                    result_by_keyword[keyword]['IMAGE'] = 'no pic' if not a_img else a_img['data-mediumthumb']
+                    result_by_keyword[keyword]['DURATION'] = duration
+                    result_by_keyword[keyword]['QUALITY'] = 'LOW' if not hd else hd.text
+                    result_by_keyword[keyword]['VOTE'] = percent
+                    result_by_keyword[keyword]['VIEWS'] = views
+                    result_by_keyword[keyword]['VERIFIED'] = 'NOT CHECKED' if not verified else 'CHECKED'
+                    result_by_keyword[keyword]['TIME'] = added
 
                     if not new_key: new_key = current
-                    if not new_checked_key and checked: new_checked_key = current
+                    if not new_checked_key and verified: new_checked_key = current
 
             page += 1
 
@@ -87,4 +99,11 @@ def search(email):
             if not new_checked_key: new_checked_key = keyword.checked_key
             user.update_keyword(keyword.search_text, new_key, new_checked_key)
 
+    html = sample.html_format.create(result_by_keyword)
+
+    with open("file.html", "w") as text_file:
+        text_file.write(html)
+
+    webbrowser.open('file://' + os.path.realpath("file.html"))
     user.save()
+

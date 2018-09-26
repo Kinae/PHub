@@ -1,9 +1,9 @@
-import sample.service
 from flask import Flask
 from flask import request
 
-app = Flask(__name__)
+import sample.service
 
+app = Flask(__name__)
 
 @app.route('/user/register', methods=['POST'])
 def register():
