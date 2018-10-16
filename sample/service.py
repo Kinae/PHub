@@ -1,4 +1,5 @@
 import httplib
+import io
 import os
 import urllib2
 import webbrowser
@@ -42,8 +43,8 @@ def _append_keywords_to_user(user, keywords):
 
 
 def search(email):
+    block_str = ''
     user = sample.database.find_by_email(email)
-    result_by_keyword = {}
     for keyword in user.keyword_list:
         print 'Search text : ' + keyword.search_text
 
@@ -51,6 +52,7 @@ def search(email):
         new_key = None
         new_checked_key = None
         condition = False
+        gallery_str = ''
         while condition is False:
             response = urllib2.urlopen("https://fr.pornhub.com/video/search?search=" + keyword.search_text + "&o=mr&page=" + str(page))
             page_source = response.read()
@@ -62,7 +64,7 @@ def search(email):
                 if current == keyword.key:
                     condition = True
                     break
-                elif current == keyword.checked_key:
+                elif current == keyword.checked_key or page == 5:
                     condition = True
                     print 'Normal last key not found !'
                     break
@@ -79,16 +81,17 @@ def search(email):
                     verified = li.find('span', {'class': 'own-video-thumbnail main-sprite tooltipTrig'})
                     added = li.find('var', {'class': 'added'}).text
 
-                    result_by_keyword[keyword] = {}
-                    result_by_keyword[keyword]['TITLE'] = 'no title' if not a_img else a_img['alt']
-                    result_by_keyword[keyword]['VIDEO_KEY'] = current
-                    result_by_keyword[keyword]['IMAGE'] = 'no pic' if not a_img else a_img['data-mediumthumb']
-                    result_by_keyword[keyword]['DURATION'] = duration
-                    result_by_keyword[keyword]['QUALITY'] = 'LOW' if not hd else hd.text
-                    result_by_keyword[keyword]['VOTE'] = percent
-                    result_by_keyword[keyword]['VIEWS'] = views
-                    result_by_keyword[keyword]['VERIFIED'] = 'NOT CHECKED' if not verified else 'CHECKED'
-                    result_by_keyword[keyword]['TIME'] = added
+                    result_by_keyword = {'TITLE': 'no title' if not a_img else a_img['alt'],
+                                         'VIDEO_KEY': current,
+                                         'IMAGE': 'no pic' if not a_img else a_img['data-mediumthumb'],
+                                         'DURATION': duration,
+                                         'QUALITY': '' if not hd else hd.text,
+                                         'VOTE': percent,
+                                         'VIEWS': views,
+                                         'VERIFIED': 'NOT CHECKED' if not verified else 'CHECKED',
+                                         'TIME': added}
+
+                    gallery_str += sample.html_format.construct_gallery(result_by_keyword)
 
                     if not new_key: new_key = current
                     if not new_checked_key and verified: new_checked_key = current
@@ -99,9 +102,11 @@ def search(email):
             if not new_checked_key: new_checked_key = keyword.checked_key
             user.update_keyword(keyword.search_text, new_key, new_checked_key)
 
-    html = sample.html_format.create(result_by_keyword)
+        if gallery_str is not '': block_str += sample.html_format.construct_block(keyword.search_text, gallery_str)
 
-    with open("file.html", "w") as text_file:
+    html = sample.html_format.build(block_str)
+
+    with io.open('file.html', 'w', encoding='utf-8') as text_file:
         text_file.write(html)
 
     webbrowser.open('file://' + os.path.realpath("file.html"))
